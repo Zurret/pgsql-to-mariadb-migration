@@ -90,10 +90,6 @@ The default batch size for migrating large tables is set to `100`. You can chang
 - Charset: `utf8mb4`
 - Default Table Engine: `InnoDB` (can be changed using the `TABLE_ENGINE` environment variable)
 
-## Warning
-
-This script is provided as-is. Use it at your own risk.
-
 ## License
 
 This script is released under the [MIT License](LICENSE).
