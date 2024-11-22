@@ -13,15 +13,15 @@ echo "Press [Enter] to continue or Ctrl+C to exit.\n";
 fgets(STDIN);
 
 const PGSQL_TO_MARIADB_TYPES = [
-    'smallint' => 'INT',
-    'integer' => 'INT',
-    'bigint' => 'BIGINT',
-    'boolean' => 'TINYINT(1)',
-    'character varying' => 'VARCHAR(255)',
-    'text' => 'TEXT',
+    'smallint'                    => 'INT',
+    'integer'                     => 'INT',
+    'bigint'                      => 'BIGINT',
+    'boolean'                     => 'TINYINT(1)',
+    'character varying'           => 'VARCHAR(255)',
+    'text'                        => 'TEXT',
     'timestamp without time zone' => 'DATETIME',
-    'date' => 'DATE',
-    'numeric' => 'DECIMAL(20,6)',
+    'date'                        => 'DATE',
+    'numeric'                     => 'DECIMAL(20,6)',
 ];
 
 const BATCH_SIZE = 100;
@@ -51,7 +51,7 @@ function loadEnv(string $filePath): void
  */
 function main(): void
 {
-    loadEnv(__DIR__ . '/.env');
+    loadEnv(__DIR__.'/.env');
 
     $pgsqlConfig = [
         'dsn' => sprintf(
@@ -60,7 +60,7 @@ function main(): void
             getenv('PGSQL_PORT') ?: '5432',
             getenv('PGSQL_DBNAME') ?: 'your_dbname'
         ),
-        'user' => getenv('PGSQL_USER') ?: 'your_user',
+        'user'     => getenv('PGSQL_USER') ?: 'your_user',
         'password' => getenv('PGSQL_PASSWORD') ?: 'your_password',
     ];
 
@@ -71,7 +71,7 @@ function main(): void
             getenv('MARIADB_PORT') ?: '3306',
             getenv('MARIADB_DBNAME') ?: 'your_dbname'
         ),
-        'user' => getenv('MARIADB_USER') ?: 'your_user',
+        'user'     => getenv('MARIADB_USER') ?: 'your_user',
         'password' => getenv('MARIADB_PASSWORD') ?: 'your_password',
     ];
 
@@ -79,7 +79,7 @@ function main(): void
         $pgsql = createPDOConnection($pgsqlConfig['dsn'], $pgsqlConfig['user'], $pgsqlConfig['password']);
         $mariadb = createPDOConnection($mariadbConfig['dsn'], $mariadbConfig['user'], $mariadbConfig['password']);
     } catch (PDOException $e) {
-        logError("Database connection failed: " . $e->getMessage());
+        logError('Database connection failed: '.$e->getMessage());
         exit("ERROR: Unable to connect to one of the databases.\n");
     }
 
@@ -94,10 +94,10 @@ function main(): void
 function createPDOConnection(string $dsn, string $user, string $password): PDO
 {
     return new PDO($dsn, $user, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4', // For MariaDB
-        PDO::ATTR_PERSISTENT => true,
+        PDO::ATTR_PERSISTENT         => true,
     ]);
 }
 
@@ -112,6 +112,7 @@ function migrateDatabase(PDO $pgsql, PDO $mariadb, string $tableEngine): void
 
     if (!$tables) {
         echo "No tables found in the PostgreSQL database.\n";
+
         return;
     }
 
@@ -135,11 +136,12 @@ function migrateDatabase(PDO $pgsql, PDO $mariadb, string $tableEngine): void
 function fetchTableColumns(PDO $pdo, string $tableName): array
 {
     $stmt = $pdo->prepare(
-        "SELECT column_name, data_type, is_nullable 
+        'SELECT column_name, data_type, is_nullable 
          FROM information_schema.columns 
-         WHERE table_name = :table_name"
+         WHERE table_name = :table_name'
     );
     $stmt->execute(['table_name' => $tableName]);
+
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -151,11 +153,12 @@ function createMariaDBTable(PDO $mariadb, string $tableName, array $columns, str
     $columnsSql = array_map(function ($col) {
         $type = PGSQL_TO_MARIADB_TYPES[$col['data_type']] ?? 'TEXT';
         $nullable = $col['is_nullable'] === 'YES' ? 'NULL' : 'NOT NULL';
-        return sprintf("`%s` %s %s", $col['column_name'], $type, $nullable);
+
+        return sprintf('`%s` %s %s', $col['column_name'], $type, $nullable);
     }, $columns);
 
     $sql = sprintf(
-        "CREATE TABLE IF NOT EXISTS `%s` (%s) ENGINE=%s DEFAULT CHARSET=%s",
+        'CREATE TABLE IF NOT EXISTS `%s` (%s) ENGINE=%s DEFAULT CHARSET=%s',
         $tableName,
         implode(', ', $columnsSql),
         $tableEngine,
@@ -198,7 +201,6 @@ function sanitizeRow(array &$row, array $columns): void
     }
 }
 
-
 /**
  * Transfer data from PostgreSQL to MariaDB.
  */
@@ -206,34 +208,36 @@ function transferTableData(PDO $pgsql, PDO $mariadb, string $tableName, array $c
 {
     $columnNames = array_column($columns, 'column_name');
     $sourceColumns = implode(', ', $columnNames);
-    $placeholders = '(' . implode(',', array_fill(0, count($columnNames), '?')) . ')';
+    $placeholders = '('.implode(',', array_fill(0, count($columnNames), '?')).')';
 
     $stmt = $mariadb->prepare(
-        sprintf("INSERT INTO `%s` (%s) VALUES %s", $tableName, implode(', ', $columnNames), $placeholders)
+        sprintf('INSERT INTO `%s` (%s) VALUES %s', $tableName, implode(', ', $columnNames), $placeholders)
     );
 
     $offset = 0;
 
     while (true) {
         $data = $pgsql->query(
-            "SELECT $sourceColumns FROM \"$tableName\" LIMIT " . BATCH_SIZE . " OFFSET $offset"
+            "SELECT $sourceColumns FROM \"$tableName\" LIMIT ".BATCH_SIZE." OFFSET $offset"
         )->fetchAll();
 
-        if (!$data) break;
+        if (!$data) {
+            break;
+        }
 
         foreach ($data as &$row) {
             try {
                 sanitizeRow($row, $columns); // Sanitize data before insert
                 $stmt->execute(array_values($row));
             } catch (PDOException $e) {
-                echo "\nError migrating row in table `$tableName`: " . $e->getMessage() . "\n";
-                echo "Row Data: " . json_encode($row) . "\n";
+                echo "\nError migrating row in table `$tableName`: ".$e->getMessage()."\n";
+                echo 'Row Data: '.json_encode($row)."\n";
                 continue; // Skip problematic row
             }
         }
 
         $offset += BATCH_SIZE;
-        echo ".";
+        echo '.';
     }
 
     echo " Done!\n";
